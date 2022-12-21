@@ -4,14 +4,14 @@
  * @Author: Adrian Lin
  * @Date: 2022-12-17 14:43:42
  * @LastEditors: Please set LastEditors
- * @LastEditTime: 2022-12-18 20:56:04
+ * @LastEditTime: 2022-12-21 17:56:56
 -->
 ### PNMTF-2D
 PNMTF的二维并行版本
 
 ---
 
-文件架构为：
+### 文件架构
 - `dataset`
 - `model`
 - `code`
@@ -41,7 +41,7 @@ dataset目录为：`dataset_name/processed/`，存放处理好的文件`text.pkl
     - `pc、pr`：列和行通信进程数。（注意：pc*pr == 总进程数（即-n指定的进程数））
 - 天河服务器上运行示例：
   ```shell
-  yhrun -N 8 -n 192 -p bigdata python3 -u ./PNMTF-2D-V1.py super1-4_PNMTF-2D-V1_CLASSIC4 --pr 32 --pc 6
+  yhrun -N 8 -n 192 -p bigdata python3 -u ./PNMTF-2D-V1.py --data_name classic4 --exp_ini super1-4_PNMTF-2D-V1_CLASSIC4 --pr 32 --pc 6
   ```
   - 主要参数：  
     - `data_name`和`exp_ini`来运行程序，用来指定运行的模型和数据集；
