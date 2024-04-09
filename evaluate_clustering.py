@@ -5,7 +5,7 @@ from turtle import pos, shape
 import numpy as np
 from scipy import sparse
 
-# from sklearn.metrics.cluster import rand_score  # 用不到，注释掉
+# from sklearn.metrics.cluster import rand_score  
 from sklearn.metrics.cluster import adjusted_rand_score
 from sklearn.metrics.cluster import normalized_mutual_info_score
 # from sklearn.metrics.cluster import pair_confusion_matrix
@@ -131,7 +131,7 @@ def evaluate_cluster(file_true, V, res_dir, post='max'):
 
     labels_true = get_true_label(file_true)
 
-    # labels_pred follow 2022 TKDE PNMTF的设置
+    # labels_pred follow 2022 TKDE PNMTF
     labels_pred = cal_cluster_label(V, post=post)
     labels_pred = np.asarray(labels_pred).flatten()
     nmi, ari = cal_indexes(labels_true, labels_pred)
