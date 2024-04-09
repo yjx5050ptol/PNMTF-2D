@@ -27,7 +27,7 @@ def get_top_words(topic_word_mat, vocabulary, k):
     # print(topic_words)
     return topic_words
 
-# 数值最高的T个主题词
+# top-N words
 def topT(topic_word, T):
     topic = []
     for i in range(len(topic_word)):
@@ -59,8 +59,7 @@ def cal_coherence(topic_words, methods, texts, vocab):  # topic_words: from get_
         coherence[method] = CoherenceModel(topics=topic_words, texts=texts, dictionary=vocab, coherence=method).get_coherence()
     return coherence
 
-# 计算连贯性, 来自祖传算法 。。。
-# 以文档为窗口
+
 def compute_coherence(topic_words, doc_word):
     topic_words = np.array(topic_words)
     topic_size, word_size = np.shape(topic_words)
@@ -98,7 +97,6 @@ def compute_coherence(topic_words, doc_word):
 
     return np.mean(coherence)
 
-# 计算主题冗余度，以重复出现的词数量来统计
 def evaluate_topic_diversity(topic_words):
     """topic_words is in the form of [[w11,w12,...],[w21,w22,...]]"""
     topic_words_np = np.array(topic_words)
@@ -111,7 +109,6 @@ def evaluate_topic_diversity(topic_words):
     # print(f"topic_diversity:{TU}")
     return TU
 
-# 计算主题冗余度，以重复出现的词数量来统计
 def compute_topic_diversity(topic_words):
     """topic_words is in the form of [[w11,w12,...],[w21,w22,...]]"""
     vocab = set(sum(topic_words, []))
@@ -122,7 +119,7 @@ def evaluate_coherence(topic_word_mat, k, methods, vocabulary, text_filename, do
     topic_words = get_top_words(topic_word_mat, vocabulary, k)
     texts, vocab = get_internal_texts(text_filename)
     metrics_dict = cal_coherence(topic_words, methods, texts, vocab)
-    # npmi TU 都是前5、10、15个主题词的平均值
+    
     metrics_dict['npmi'] = compute_coherence(topic_word_mat, doc_word)
     metrics_dict['tu'] = evaluate_topic_diversity(topic_words)
     return metrics_dict

@@ -42,24 +42,24 @@ def merge_chunk(pipeline, merge_chunk_path):
         for line in y_merge:
             f.write(line)
     
-def concurrence(merge_chunk_path, vocabulary, save_path, num_word):   # 构造词共现矩阵并以文件形式保存
+def concurrence(merge_chunk_path, vocabulary, save_path, num_word):   # co-occurrence matrix construction
     window_size = 5
     K = sparse.lil_matrix((num_word, num_word), dtype='float64')
-    word_to_id = {} # 词到词id的映射字典
+    word_to_id = {} # a dict mapping word to idx
     for id, word in enumerate(vocabulary):
         word_to_id[word] = id
     for line in tqdm(open(merge_chunk_path)):
         line_list = line.strip().split()
-        for ind_focus, wid_focus in enumerate(line_list):  # ind_focus:中心窗口下标，wid_focus中心窗口词
-            ind_lo = max(0, ind_focus-window_size)  # 左窗口下标
-            ind_hi = min(len(line_list), ind_focus+window_size+1)  # 右窗口下标
+        for ind_focus, wid_focus in enumerate(line_list):  
+            ind_lo = max(0, ind_focus-window_size)  
+            ind_hi = min(len(line_list), ind_focus+window_size+1)  
             for ind_c in range(ind_lo, ind_hi):
-                if ind_c == ind_focus:  # 跳过遍历指示下标ind_c和中心下标一样的情况
+                if ind_c == ind_focus:  
                     continue
-                if line_list[ind_c] == wid_focus:    # 跳过遍历指示词和中心词一样的情况
+                if line_list[ind_c] == wid_focus:    
                     continue
-                focus_id = word_to_id[wid_focus]    # 中心词的词id
-                c_id = word_to_id[line_list[ind_c]]    # 遍历指示词的词id                
+                focus_id = word_to_id[wid_focus]   
+                c_id = word_to_id[line_list[ind_c]]                 
                 K[focus_id, c_id] += 1
     utils.save_as_triple(K, save_path)
 
@@ -95,7 +95,7 @@ def summation(C_local, comm, rank=-1, counts=None, pattern='Allreduce'):
         return None
 
 
-def scatter_sparse(mat, comm, rank, counts_p, displ_p, dim, mode='row'):    # 稀疏矩阵的scatter
+def scatter_sparse(mat, comm, rank, counts_p, displ_p, dim, mode='row'):    
     ''' mode: 'row' or 'col' '''
     if rank == 0:
         # csr meta-data
@@ -118,26 +118,26 @@ def scatter_sparse(mat, comm, rank, counts_p, displ_p, dim, mode='row'):    # �
     comm.Bcast(indptr, root=0)
 
     # Calculate counts and displ for indices and data
-    displ_data = [indptr[start] for start in displ_p]   # 获取每隔m/p行的对应行首元素相对于全元素的偏移
-    displ_data.append(indptr[-1])   # 加入最后一个元素（元素数量）
-    counts_data = [displ_data[j] - displ_data[j-1] for j in range(1, len(displ_data))]  # 获取每m/p行的元素数量
+    displ_data = [indptr[start] for start in displ_p]   
+    displ_data.append(indptr[-1])   
+    counts_data = [displ_data[j] - displ_data[j-1] for j in range(1, len(displ_data))]  
     displ_data = displ_data[0:-1]  # remove the last ele of indptr
 
     # Scatterv for indices and data
     indices_p = np.empty(counts_data[rank], dtype='i')
     data_p = np.empty(counts_data[rank], dtype='float64')
-    comm.Scatterv([indices, counts_data, displ_data, MPI.INT], indices_p, root=0)   # scatter各rank的indices到indices_p中
-    comm.Scatterv([data, counts_data, displ_data, MPI.DOUBLE], data_p, root=0)      # scatter各rank的data到data_p中
+    comm.Scatterv([indices, counts_data, displ_data, MPI.INT], indices_p, root=0)   
+    comm.Scatterv([data, counts_data, displ_data, MPI.DOUBLE], data_p, root=0)      
 
     # construct mat_row
-    indptr_p = indptr[displ_p[rank]: displ_p[rank] + counts_p[rank] + 1]  # +1: rf. scipy doc of indptr # 根据总indptr构造各个rank的indptr_p
+    indptr_p = indptr[displ_p[rank]: displ_p[rank] + counts_p[rank] + 1]  
     offset = indptr_p[0]
-    indptr_p = indptr_p - offset    # 各rank取总indptr中对应段，减去第一个元素的值，使第一个元素偏移为0。
+    indptr_p = indptr_p - offset    
 
     if mode == 'row':
-        mat_p = sparse.csr_matrix((data_p, indices_p, indptr_p), shape=(counts_p[rank], dim))   # 根据接收的data_p, indices_p, indptr_p构造自己rank的csr稀疏矩阵
+        mat_p = sparse.csr_matrix((data_p, indices_p, indptr_p), shape=(counts_p[rank], dim))   # csr format
     elif mode == 'col':
-        mat_p = sparse.csc_matrix((data_p, indices_p, indptr_p), shape=(dim, counts_p[rank]))   # 根据接收的data_p, indices_p, indptr_p构造自己rank的csc稀疏矩阵
+        mat_p = sparse.csc_matrix((data_p, indices_p, indptr_p), shape=(dim, counts_p[rank]))   # csd format
 
     return mat_p
 
@@ -161,20 +161,20 @@ if __name__ == '__main__':
     work_directory = args.work_directory
     
     comm = MPI.COMM_WORLD
-    comm_rank = comm.Get_rank() # 编号
-    comm_size = comm.Get_size() # 大小
+    comm_rank = comm.Get_rank() 
+    comm_size = comm.Get_size() 
 
-    # 笛卡尔拓扑 start
-    pr = args.pr  # Number of row processors in the 2D processor grid  # pr是列通信域进程数量
-    pc = args.pc  # Number of columnn processors in the 2D processor grid  # pc是行通信域进程数量
-    reorder = 0 # 是否重排
-    dimSizes = [None] * 2   # 分配进程在不同维度上的数目
-    periods = [1, 1]    # 子进程是否循环
+    # Cartesian topology start
+    pr = args.pr  # Number of row processors in the 2D processor grid  
+    pc = args.pc  # Number of columnn processors in the 2D processor grid  
+    reorder = 0 
+    dimSizes = [None] * 2   
+    periods = [1, 1]    # is loop 
     nd = 2
     dimSizes[0] = pr
     dimSizes[1] = pc
 
-    if dimSizes[0] * dimSizes[1] != comm_size:  # 两维度进程数相乘等于总进程数
+    if dimSizes[0] * dimSizes[1] != comm_size:  
         if comm_rank == 0:
             print("Processor grid dimensions do not multiply to MPI_SIZE")
         comm.Barrier()
@@ -192,10 +192,10 @@ if __name__ == '__main__':
     m_col_size = comm_cart_cols.Get_size()
     m_col_rank = comm_cart_cols.Get_rank()
 
-    if comm_rank == 0:  # 测试行、列通信子包含进程数量（行通信子2个进程，列通信子3个进程）
+    if comm_rank == 0:  
         print("m_row_size:%d, m_col_size:%d" % (m_row_size, m_col_size))
 
-    # 笛卡尔拓扑 end
+    # Cartesian topology end
 
 
 
@@ -205,13 +205,12 @@ if __name__ == '__main__':
     num_doc_topic = None
     eps = None
     loss_trend = 'False'
-    seed_num = 0    # 初始化为0
+    seed_num = 0    
 
     if comm_rank == 0:
 
-        # work_directory = os.path.dirname(os.path.abspath(__file__)) # 获取当前目录路径
-        # exp_ini = sys.argv[1]   # 获取命令行实验名参数
-
+        # work_directory = os.path.dirname(os.path.abspath(__file__)) 
+        # exp_ini = sys.argv[1]   
         # experiment.ini
         exp_config = cp.ConfigParser()
         exp_config.read(os.path.join(work_directory, 'experiment.ini'), encoding='utf-8')
@@ -221,12 +220,12 @@ if __name__ == '__main__':
         max_step = int(exp_config.get(exp_ini, 'max_step'))
         num_word_topic = int(exp_config.get(exp_ini, 'num_word_topic'))
         num_doc_topic = int(exp_config.get(exp_ini, 'num_doc_topic'))
-        top_n = int(exp_config.get(exp_ini, 'top_n'))  # 主题词数目
+        top_n = int(exp_config.get(exp_ini, 'top_n'))  # num of topic words
         eps = float(exp_config.get(exp_ini, 'eps'))
         coh_metrics = exp_config.get(exp_ini, 'coh_metrics').split(',')
         if exp_config.has_option(exp_ini, 'loss_trend'):
-            loss_trend = exp_config.get(exp_ini, 'loss_trend')  # 字符串类型'False'或者'True'
-        if exp_config.has_option(exp_ini, 'seed_num'):  # 若exp_ini中有就读取，否则就为默认值0
+            loss_trend = exp_config.get(exp_ini, 'loss_trend')  
+        if exp_config.has_option(exp_ini, 'seed_num'):  
             seed_num = int(exp_config.get(exp_ini, 'seed_num'))
 
         if model_name != model_name_input:
@@ -237,17 +236,17 @@ if __name__ == '__main__':
         # dataset.ini
         data_config = cp.ConfigParser()
         data_config.read(os.path.join(work_directory, 'dataset.ini'), encoding='utf-8')
-        DATA_DIR = data_config.get(data_name, "DATA_DIR")   # dataset 存放位置
-        RESULT_DIR = data_config.get(data_name, "RESULT_DIR")     # 结果存放位置  /res
+        DATA_DIR = data_config.get(data_name, "DATA_DIR")   
+        RESULT_DIR = data_config.get(data_name, "RESULT_DIR")     
         RESULT_DIR = os.path.join(RESULT_DIR, data_name, model_name, exp_ini)
         if not os.path.exists(RESULT_DIR):
             os.makedirs(RESULT_DIR)
 
-        file_true = os.path.join(DATA_DIR, 'label.pkl')    # 读label
+        file_true = os.path.join(DATA_DIR, 'label.pkl')   
         vocab_file = os.path.join(DATA_DIR, 'vocab.pkl')
         text_file = os.path.join(DATA_DIR, 'text.pkl')
         tfidf_file = os.path.join(DATA_DIR, 'tfidf.pkl')
-        ################## 如果检测到tfidf、vocab文件的存在就不再执行 ###########################
+        ################## existence check ###########################
         if not os.path.exists(tfidf_file):
             tfidf, vocabulary = utils.tfidf(text_file)
             utils.save_pkl(tfidf, tfidf_file)
@@ -256,24 +255,24 @@ if __name__ == '__main__':
         vocabulary = utils.load_pkl(vocab_file)
         
         filename_prefix = data_config.get(data_name, 'filename_prefix')
-        label = data_config.get(data_name, 'label').split(',')  # 所有数据类别名称
+        label = data_config.get(data_name, 'label').split(',')  
 
         print(exp_ini)
         print("max_step {max_step}, num_word_topic {num_word_topic}, num_doc_topic {num_doc_topic}, top_n {top_n}, "
               "eps {eps}, p {p}, loss_trend {loss_trend}, seed_num {seed_num}.".format(
                max_step=max_step, num_word_topic=num_word_topic, num_doc_topic=num_doc_topic, top_n=top_n,
-               eps=eps, p=comm_size, loss_trend=loss_trend, seed_num=seed_num) + "\n")   # 可以去掉lambda_tm和lambda_c和lambda_kg
-        pipeline = os.path.join(DATA_DIR, 'chunks', filename_prefix)  # 给数据文件加上目录
+               eps=eps, p=comm_size, loss_trend=loss_trend, seed_num=seed_num) + "\n")   
+        pipeline = os.path.join(DATA_DIR, 'chunks', filename_prefix)  
 
         log_file = os.path.join(RESULT_DIR, "log.txt")
         topic_words_local_file = os.path.join(RESULT_DIR, "topic_words_local.txt") # W
         topic_words_global_file = os.path.join(RESULT_DIR, "topic_words_global.txt")   #WS
-        loss_trend_file = os.path.join(RESULT_DIR, "loss_trend.txt") # loss记录文件
-        loss_list = []  # 每次迭代loss记录列表
+        loss_trend_file = os.path.join(RESULT_DIR, "loss_trend.txt") # loss FILE
+        loss_list = []  
 
         log_files = [log_file, topic_words_local_file, topic_words_global_file, loss_trend_file]
 
-        for f in log_files: # 所有log中写入实验名、时间、类别、参数
+        for f in log_files: 
             with open(f, "a") as fobj:
                 fobj.write(exp_ini + ' ')
                 fobj.write(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + " PNMTF_2D Start" + "\n")
@@ -301,7 +300,7 @@ if __name__ == '__main__':
     seed_num = comm.bcast(seed_num, root=0)
     utils.freeze_seed(seed_num + comm_size+comm_rank)
 
-    # 由rank0初始化（其实可以每个进程各自初始化）!
+    # INITILIZATION BY ZERO 
     if comm_rank == 0:
 
         # if os.path.exists(load_D_path) and os.path.exists(read_vocabulary_path):
@@ -322,8 +321,8 @@ if __name__ == '__main__':
             #                 [0 ,0 ,28,29,30 ,0 ,0 ,31,0],
             #                 [32,33,0 ,0 ,0  ,34,0 ,35,36],
             #                 [0 ,37,38,39,0  ,0 ,0 ,0 ,0],
-            #                 [0 ,0 ,0 ,0 ,0  ,40,41,42,43]], dtype='float64')    # 测试时dtype需要是float64否则mpi通信不正常数据不对齐
-        # 读取数据
+            #                 [0 ,0 ,0 ,0 ,0  ,40,41,42,43]], dtype='float64')    # 
+        # 
         # text_reader = reader.TextReader(args.data_name, args.data_dir)
         # D, _, y = text_reader.get_matrix(data_type='all', mode='tfidf')
         # D = D.T
@@ -357,19 +356,17 @@ if __name__ == '__main__':
     num_word = comm.bcast(num_word, root=0)
     num_doc = comm.bcast(num_doc, root=0)
 
-    comm.Bcast(S, root=0) # 每个进程保存S
+    comm.Bcast(S, root=0) # broadcast S
 
-    # 二维分配D，D是sparse.csc_matrix
-    # 先由0号进程在它的col通信域以csr形式scatter
-    # 然后各row_rank=0进程在col通信域以csc形式scatter
+    
 
-    # 计算数量
+    
     rcount = cal_blocksize(num_doc, m_row_size, m_row_rank)
     ccount = cal_blocksize(num_word, m_col_size, m_col_rank)
 
-    # 计算偏移
-    rcount_list = np.empty(m_row_size, dtype='i')   # 创造存放每个进程的rcounts长度值的空间
-    ccount_list = np.empty(m_col_size, dtype='i')   # 创造存放每个进程的ccounts长度值的空间
+    
+    rcount_list = np.empty(m_row_size, dtype='i')   
+    ccount_list = np.empty(m_col_size, dtype='i')   
 
     comm_cart_rows.Allgather(np.array([rcount], dtype='i'), rcount_list)
     comm_cart_cols.Allgather(np.array([ccount], dtype='i'), ccount_list)
@@ -377,24 +374,24 @@ if __name__ == '__main__':
     displ_r = np.insert(np.cumsum(rcount_list), 0, 0)[0:-1]
     displ_c = np.insert(np.cumsum(ccount_list), 0, 0)[0:-1]
 
-    # 先由0号进程在它的col通信域以csr形式scatter
+    # scatter in cols
     if m_row_rank == 0:
         # scatterv
         D_r = scatter_sparse(D, comm_cart_cols, m_col_rank, ccount_list, displ_c, num_doc, mode='row')
 
-    # 然后各row_rank=0进程在row通信域以csc形式scatter
+    # scatter in rows
     Dij = scatter_sparse(D_r, comm_cart_rows, m_row_rank, rcount_list, displ_r, ccount, mode='col')
 
 
-    # 创建W和V的空间并初始化。
-    # 计算每个进程占用的W的W_ccount
+    # initialize W and V
+
     W_ccount = cal_blocksize(ccount, m_row_size, m_row_rank)
     Wij = np.random.rand(W_ccount, num_word_topic).astype('float64')
-    # 计算每个进程占用的W的V_rcount
+    # 
     V_rcount = cal_blocksize(rcount, m_col_size, m_col_rank)
     Vji = np.random.rand(V_rcount, num_doc_topic).astype('float64')
 
-    # count和displ计算，避免在迭代中反复计算
+    # 
     # 1
     rcounts_Vji = np.empty(m_col_size, dtype='i')
     comm_cart_cols.Allgather(np.array([V_rcount], dtype='i'), rcounts_Vji)
@@ -415,12 +412,12 @@ if __name__ == '__main__':
     counts_DVij = counts_WSi # = ccounts_Wij * num_doc_topic
 
     if comm_rank == 0:
-        time_start = time.time()  # timing  # 测单个迭代时间，用总迭代时间除迭代次数
+        time_start = time.time()  # timing  
 
     '''Iterative Updates'''
     # Update W, S, V
     for times in tqdm(range(max_step)):
-    # for i in range(1):  # test一次迭代
+    # for i in range(1):  
         '''update W'''
         # pij computes localVST
         localVST = Vji.dot(S.T)
@@ -460,7 +457,7 @@ if __name__ == '__main__':
         '''update S'''
         # pij collects Vj using all-gather
         Vj = np.empty((rcount, num_doc_topic))
-        # displ_Vji = np.insert(np.cumsum(counts_Vji), 0, 0)[0:-1]    # 移到开始迭代前--- 5
+        # displ_Vji = np.insert(np.cumsum(counts_Vji), 0, 0)[0:-1]    
         comm_cart_cols.Allgatherv(Vji, [Vj, counts_Vji, displ_Vji, MPI.DOUBLE])
 
         # pij computes Eij = Dij dot Vj
@@ -486,16 +483,15 @@ if __name__ == '__main__':
 
         '''compute loss'''
         if loss_trend == "True":
-            # pij 计算 ((WS)i)j = (Wi)j dot S
+            # pij - ((WS)i)j = (Wi)j dot S
             WSij = Wij.dot(S)
-            # pij 获得(WS)i通过在行进程中Allgather( ((WS)i)j )
+            # pij - Allgather( ((WS)i)j )
             comm_cart_rows.Allgatherv(WSij, [WSi, counts_WSi, displ_WSi, MPI.DOUBLE])
-            # pij 在二维并行更新S时已在列进程中gather了Vj
-            # pij 计算 (WSVT)ij = (WS)i dot Vj.T
+            # pij - (WSVT)ij = (WS)i dot Vj.T
             WSVTij = WSi.dot(Vj.T)
-            # pij 计算 Aij = Dij - (WSVT)ij，计算 aij = norm(Aij)^2
-            aij = np.linalg.norm(Dij - WSVTij)**2   # norm自带开平方，所以reduce前要平方取消根号
-            # 0号进程计算 a = reduce(aij, root=0)
+            # pij -  Aij = Dij - (WSVT)ij， aij = norm(Aij)^2
+            aij = np.linalg.norm(Dij - WSVTij)**2   
+            # zero reduce
             a = comm.reduce(aij, op=MPI.SUM, root=0)
 
             break_flag = False
@@ -505,7 +501,7 @@ if __name__ == '__main__':
                 f = open(loss_trend_file, "a")
                 f.write(str(loss) + "\n")
                 f.close()
-                if len(loss_list) > 2 and abs(loss_list[-1] - loss_list[-2]) < 1e-4:    # 收敛条件可以在experiment.ini中设置
+                if len(loss_list) > 2 and abs(loss_list[-1] - loss_list[-2]) < 1e-4:    
                     break_flag = True
             break_flag = comm.bcast(break_flag, root=0)
             if break_flag:
@@ -514,7 +510,7 @@ if __name__ == '__main__':
 
 
     if comm_rank == 0:
-        total_iter_time = time.time() - time_start  # timing    # 总迭代时间
+        total_iter_time = time.time() - time_start  # timing    
 
     '''Result Gathering'''
     ccounts_gather_Wij = np.empty(comm_size, dtype='i')
@@ -523,12 +519,12 @@ if __name__ == '__main__':
     displ_gather_Wij = np.insert(np.cumsum(counts_gather_Wij), 0, 0)[0:-1]
     comm.Gatherv(Wij, [W, counts_gather_Wij, displ_gather_Wij, MPI.DOUBLE], root=0)
     
-    # 二维gather方法，先gather到col首，再由col首gather到row首
-    # 先gather到col首
+    # 2-dimensional gather
+    # gather to the first thread of col
     Vj = np.empty((rcount, num_doc_topic))
     displ_Vji = np.insert(np.cumsum(counts_Vji), 0, 0)[0:-1]
     comm_cart_cols.Gatherv(Vji, [Vj, counts_Vji, displ_Vji, MPI.DOUBLE], root=0)
-    # 再由col首gather到row首
+    # additional gather on row
     if m_col_rank == 0:
         rcount_Vj = np.sum(counts_Vji)
         rcounts_Vj = np.empty(m_row_size, dtype='i')
