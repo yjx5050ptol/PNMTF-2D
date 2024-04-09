@@ -1,10 +1,10 @@
 <!--
  * @Descripttion: 
  * @version: 
- * @Author: Adrian Lin
- * @Date: 2022-12-17 14:43:42
+ * @Author: yanjx
+ * @Date: 2024-04-09
  * @LastEditors: Please set LastEditors
- * @LastEditTime: 2022-12-21 17:56:56
+ * @LastEditTime: 2024-04-09 18:50:06
 -->
 ### PNMTF-2D
 the official code for PNMTF-2D
@@ -32,7 +32,7 @@ the parameter settings
 #### 3. dataset.ini
 the required information for each dataset
 
-#### 4. 运行方式
+#### 4. running
 `mpi4py`，`python -m pip install mip4py`.
 Python version recommended : `3.8.5`, some unexpected problem will happen with newer versions.
 - running command：
@@ -46,7 +46,7 @@ Python version recommended : `3.8.5`, some unexpected problem will happen with n
   ```shell
   yhrun -N 8 -n 192 -p bigdata python3 -u ./PNMTF-2D-V1.py --data_name classic4 --exp_ini super1-4_PNMTF-2D-V1_CLASSIC4 --pr 32 --pc 6
   ```
-  - 主要参数：  
+  - main paras：  
     - `data_name` `exp_ini` to specify the dataset and paras
     - `pc、pr`：the numbers of col and row threads, pr * pc = p
     - `-N`：num of nodes；
